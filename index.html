@@ -1,0 +1,1824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini-Blox Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #111; color: white; }
+        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* UI Layers */
+        #main-menu, #game-details, #pause-menu, #auth-overlay { z-index: 50; }
+        #game-ui, #editor-ui { z-index: 10; pointer-events: none; }
+        .pointer-auto { pointer-events: auto; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+
+        .panel {
+            background: rgba(17, 24, 39, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 12px; height: 12px;
+            border: 2px solid rgba(255,255,255,0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            mix-blend-mode: difference;
+        }
+
+        .slot {
+            width: 45px; height: 45px;
+            border-radius: 6px;
+            border: 2px solid #444;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: 0.2s;
+            background: #222;
+        }
+        .slot.active { border-color: #3b82f6; transform: translateY(-5px); box-shadow: 0 5px 15px rgba(59,130,246,0.5); }
+        .block-preview { width: 25px; height: 25px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <!-- MAIN MENU (HUB) -->
+    <div id="main-menu" class="absolute inset-0 bg-gray-900 overflow-y-auto flex flex-col hidden">
+        <nav class="flex items-center p-4 bg-gray-800 border-b border-gray-700 shadow-md sticky top-0 z-10">
+            <div class="text-3xl font-black italic tracking-tighter text-blue-400 mr-10 shadow-sm">MINI-BLOX</div>
+            <div class="flex gap-6 text-lg font-semibold text-gray-300">
+                <button class="hover:text-white transition" onclick="showTab('discover')">Discover</button>
+                <button class="hover:text-white transition" onclick="showTab('avatar')">Avatar</button>
+                <button class="hover:text-blue-400 transition" onclick="showTab('create')">Studio / Create</button>
+            </div>
+            <div class="ml-auto flex items-center gap-4">
+                <button class="hover:text-white transition text-2xl" onclick="openSettings()" title="Settings">⚙️</button>
+                <div class="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center text-sm" id="hub-avatar-icon">🙂</div>
+                <span id="nav-username" class="font-bold">Loading...</span>
+            </div>
+        </nav>
+
+        <div id="tab-discover" class="p-8 flex-1">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-3xl font-bold">Recommended Games</h2>
+                <button class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-6 rounded-lg transition shadow-lg flex items-center gap-2" onclick="generateAIGameIdea()">
+                    ✨ AI Game Pitch
+                </button>
+            </div>
+            <div id="game-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                
+                <!-- Game Card: Obby -->
+                <div class="bg-gray-800 rounded-xl overflow-hidden cursor-pointer hover:scale-105 transition shadow-lg border border-gray-700" onclick="openGameDetails('obby', 'Mega Fun Obby', 'Jump through obstacles and reach the end! Don\'t fall!', 'from-green-400 to-blue-500')">
+                    <div class="h-48 bg-gradient-to-br from-green-400 to-blue-500"></div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-1">Mega Fun Obby</h3>
+                        <p class="text-sm text-gray-400 flex items-center gap-2">🟢 Multiplayer</p>
+                    </div>
+                </div>
+
+                <!-- Game Card: Sandbox -->
+                <div class="bg-gray-800 rounded-xl overflow-hidden cursor-pointer hover:scale-105 transition shadow-lg border border-gray-700" onclick="openGameDetails('sandbox', 'Ultimate Sandbox', 'Build anything you want with friends. Real-time synced build mode!', 'from-yellow-400 to-orange-500')">
+                    <div class="h-48 bg-gradient-to-br from-yellow-400 to-orange-500"></div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-1">Ultimate Sandbox</h3>
+                        <p class="text-sm text-gray-400 flex items-center gap-2">🟢 Multiplayer</p>
+                    </div>
+                </div>
+
+                 <!-- Game Card: Glass Bridge -->
+                 <div class="bg-gray-800 rounded-xl overflow-hidden cursor-pointer hover:scale-105 transition shadow-lg border border-gray-700" onclick="openGameDetails('bridge', 'Glass Bridge Survival', 'Step on the right platforms to survive.', 'from-purple-500 to-pink-500')">
+                    <div class="h-48 bg-gradient-to-br from-purple-500 to-pink-500"></div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-1">Glass Bridge Survival</h3>
+                        <p class="text-sm text-gray-400 flex items-center gap-2">🟢 Multiplayer</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- AVATAR TAB -->
+        <div id="tab-avatar" class="p-8 flex-1 hidden">
+            <h2 class="text-3xl font-bold mb-8">Customize Avatar</h2>
+            <div class="bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-lg max-w-2xl mx-auto flex flex-col md:flex-row gap-12">
+                <div class="flex-1">
+                    <div class="mb-4">
+                        <label class="block text-gray-300 font-bold mb-2">Face</label>
+                        <select id="avatar-face" class="w-full bg-gray-900 border border-gray-600 text-white rounded p-3 focus:outline-none" onchange="saveAvatar()">
+                            <option value="smile">🙂 Classic Smile</option>
+                            <option value="cool">😎 Cool Shades</option>
+                            <option value="angry">😠 Angry</option>
+                            <option value="surprised">😲 Surprised</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-300 font-bold mb-2">Skin Tone</label>
+                        <input type="color" id="avatar-skin" value="#f1c27d" class="w-full h-12 rounded cursor-pointer" onchange="saveAvatar()">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-300 font-bold mb-2">Shirt Color</label>
+                        <input type="color" id="avatar-shirt" value="#0055ff" class="w-full h-12 rounded cursor-pointer" onchange="saveAvatar()">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-300 font-bold mb-2">Pants Color</label>
+                        <input type="color" id="avatar-pants" value="#111111" class="w-full h-12 rounded cursor-pointer" onchange="saveAvatar()">
+                    </div>
+                </div>
+                <div class="w-full md:w-48 flex flex-col items-center justify-center bg-gray-900 rounded-xl border border-gray-700 p-4">
+                    <div class="text-sm text-gray-400 mb-4">Preview</div>
+                    <!-- CSS Blocky Avatar Preview -->
+                    <div class="flex flex-col items-center">
+                        <div id="prev-head" class="w-12 h-12 rounded-sm mb-1 flex items-center justify-center text-xl" style="background-color: #f1c27d;">
+                            <span id="prev-face">🙂</span>
+                        </div>
+                        <div class="flex gap-1">
+                            <div id="prev-larm" class="w-6 h-16 rounded-sm" style="background-color: #f1c27d;"></div>
+                            <div id="prev-torso" class="w-16 h-16 rounded-sm" style="background-color: #0055ff;"></div>
+                            <div id="prev-rarm" class="w-6 h-16 rounded-sm" style="background-color: #f1c27d;"></div>
+                        </div>
+                        <div class="flex gap-1 mt-1">
+                            <div id="prev-lleg" class="w-7 h-16 rounded-sm" style="background-color: #111111;"></div>
+                            <div id="prev-rleg" class="w-7 h-16 rounded-sm" style="background-color: #111111;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-create" class="p-8 flex-1 hidden">
+            <h2 class="text-3xl font-bold mb-8">Mini-Blox Studio</h2>
+            <div class="bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-lg text-center max-w-2xl mx-auto mt-10">
+                <div class="text-5xl mb-4">🛠️</div>
+                <h3 class="text-2xl font-bold mb-4">Create Your Own World</h3>
+                <p class="text-gray-400 mb-8">Launch the game engine to start building environments, placing spawns, and editing object properties.</p>
+                <button class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg text-xl transition" onclick="launchGame('engine')">
+                    Launch Studio
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME DETAILS OVERLAY -->
+    <div id="game-details" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center pointer-auto z-50">
+        <div class="bg-gray-800 rounded-2xl overflow-hidden max-w-3xl w-full mx-4 border border-gray-700 shadow-2xl flex flex-col md:flex-row relative">
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl font-bold z-10" onclick="closeGameDetails()">✕</button>
+            <div id="gd-img" class="w-full md:w-1/2 h-64 md:h-auto bg-gradient-to-br"></div>
+            <div class="w-full md:w-1/2 p-8 flex flex-col justify-center">
+                <h2 id="gd-title" class="text-3xl font-bold mb-2">Game Title</h2>
+                <p id="gd-desc" class="text-gray-400 mb-6 flex-1">Description goes here.</p>
+                <p class="text-sm text-green-400 font-bold mb-4">Server Status: Online</p>
+                <button id="gd-play" class="bg-green-500 hover:bg-green-400 text-white font-bold py-4 px-8 rounded-xl text-xl w-full transition shadow-lg flex justify-center items-center gap-2">
+                    ▶ Play
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME IN-PLAY UI -->
+    <div id="game-ui" class="absolute inset-0 hidden">
+        <div id="crosshair"></div>
+        
+        <div class="absolute top-4 left-4 panel p-4 rounded-xl pointer-auto">
+            <h1 class="text-lg font-black italic tracking-tighter text-blue-400 mb-1">MINI-BLOX</h1>
+            <p class="text-xs text-gray-300">WASD: Move | Space: Jump</p>
+            <p class="text-xs text-gray-300">Mouse: Look Around</p>
+            <p class="text-xs text-gray-300 mt-2 font-bold text-yellow-400">Press ESC for Menu</p>
+        </div>
+
+        <!-- Multiplayer Chat -->
+        <div id="chat-container" class="absolute bottom-24 left-4 w-80 pointer-auto flex flex-col gap-1 z-10">
+            <div id="chat-messages" class="flex-1 overflow-y-auto max-h-48 text-sm text-white drop-shadow-md flex flex-col justify-end space-y-1 p-2 bg-black bg-opacity-40 rounded-t hidden"></div>
+            <input type="text" id="chat-input" placeholder="Press Enter to chat..." class="w-full bg-black bg-opacity-60 text-white rounded p-2 text-sm focus:outline-none focus:bg-opacity-90 font-bold border border-gray-600" maxlength="100">
+        </div>
+
+        <!-- Hotbar (Sandbox & Engine only) -->
+        <div id="hotbar" class="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-2 panel p-2 rounded-xl pointer-auto hidden">
+            <div class="text-xs text-center text-gray-400 absolute -top-6 w-full left-0 drop-shadow-md">Left Click: Place | Shift+Click: Delete</div>
+            <div class="slot active" data-color="#34d399"><div class="block-preview bg-emerald-400"></div></div>
+            <div class="slot" data-color="#60a5fa"><div class="block-preview bg-blue-400"></div></div>
+            <div class="slot" data-color="#f87171"><div class="block-preview bg-red-400"></div></div>
+            <div class="slot" data-color="#fbbf24"><div class="block-preview bg-amber-400"></div></div>
+            <div class="slot" data-color="#ffffff"><div class="block-preview bg-white"></div></div>
+            <div class="slot" data-color="#444444"><div class="block-preview bg-gray-700"></div></div>
+        </div>
+    </div>
+
+    <!-- ENGINE / STUDIO UI OVERLAY -->
+    <div id="editor-ui" class="absolute inset-0 hidden pointer-events-none">
+        
+        <!-- Studio Toolbar -->
+        <div class="absolute top-4 left-1/2 transform -translate-x-1/2 panel px-4 py-2 rounded-xl flex gap-4 pointer-auto">
+            <button id="btn-studio-play" class="text-green-400 hover:text-green-300 font-bold flex items-center gap-2 transition" onclick="toggleStudioPlay()">▶ Play Here</button>
+            <button class="text-yellow-400 hover:text-yellow-300 font-bold flex items-center gap-2 transition" onclick="runBloxScript()">📜 Run Script</button>
+        </div>
+
+        <!-- Right Panel (Explorer & Scripting) -->
+        <div class="absolute top-4 right-4 bottom-4 w-72 panel rounded-xl flex flex-col pointer-auto overflow-hidden">
+            
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-700 bg-gray-800">
+                <button id="tab-btn-explorer" class="flex-1 p-3 font-bold text-white bg-gray-700 transition" onclick="switchStudioTab('explorer')">Explorer</button>
+                <button id="tab-btn-script" class="flex-1 p-3 font-bold text-gray-400 hover:text-white transition" onclick="switchStudioTab('script')">BloxScript</button>
+            </div>
+            
+            <!-- Explorer View -->
+            <div id="view-explorer" class="flex-1 flex flex-col">
+                <div class="p-3 flex-1 overflow-y-auto text-sm text-gray-300 font-mono space-y-1">
+                    <div>▼ Workspace</div>
+                    <div class="pl-4">↳ Camera</div>
+                    <div class="pl-4">↳ Terrain</div>
+                    <div class="pl-4">↳ SpawnLocation</div>
+                    <div class="pl-4 text-blue-400">↳ Player_1</div>
+                    <div>▼ Lighting</div>
+                    <div>▼ ReplicatedStorage</div>
+                    <div>▼ ServerScriptService</div>
+                </div>
+                <div class="p-3 border-t border-gray-700 font-bold bg-gray-800">Properties</div>
+                <div class="p-3 text-sm text-gray-400 grid grid-cols-2 gap-2 h-48 overflow-y-auto">
+                    <div>Name</div><div class="text-white">Part</div>
+                    <div>Color</div><div class="text-white flex items-center gap-1"><div class="w-3 h-3 bg-blue-500 rounded-sm"></div> Blue</div>
+                    <div>Material</div><div class="text-white">Plastic</div>
+                    <div>Anchored</div><div class="text-white">true</div>
+                </div>
+            </div>
+
+            <!-- Script View -->
+            <div id="view-script" class="hidden flex-1 flex flex-col">
+                <div class="p-2 bg-gray-900 text-xs text-gray-400 flex justify-between">
+                    <span>main_script.bs</span>
+                    <span class="text-purple-400 cursor-pointer" onclick="showToast('Commands: target X Y Z, move X Y Z, color HEX, wait SECS, print MSG', false)">Help (?)</span>
+                </div>
+                <textarea id="blox-script-input" class="flex-1 bg-gray-800 text-green-400 font-mono text-sm p-3 focus:outline-none resize-none" spellcheck="false">
+// Grab the test block
+target 0 0.5 0
+
+// Animate it
+color #ff0000
+wait 1
+move 0 3 0
+print "Block goes UP!"
+wait 1
+color #00ff00
+move 0 -3 0
+print "Block goes DOWN!"
+color #ffffff
+</textarea>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAUSE MENU (ESC) -->
+    <div id="pause-menu" class="absolute inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-[50]">
+        <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 shadow-2xl w-80 text-center">
+            <h2 class="text-2xl font-bold mb-6 text-white">Game Paused</h2>
+            <button class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg w-full mb-4 transition" onclick="resumeGame()">
+                Resume Game
+            </button>
+            <button id="btn-ai-build" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-lg w-full mb-4 transition hidden" onclick="openAIBuildModal()">
+                ✨ AI Build Assistant
+            </button>
+            <button class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-3 px-6 rounded-lg w-full mb-4 transition" onclick="openSettings()">
+                Settings
+            </button>
+            <button class="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-6 rounded-lg w-full transition" onclick="leaveGame()">
+                Leave Game
+            </button>
+        </div>
+    </div>
+
+    <!-- AI BUILD MODAL -->
+    <div id="ai-build-modal" class="absolute inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center z-[60] pointer-auto">
+        <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 w-96 max-w-full shadow-2xl relative">
+            <button class="absolute top-4 right-4 text-gray-400 hover:text-white" onclick="closeAIBuildModal()">✕</button>
+            <h2 class="text-2xl font-bold mb-2 text-white flex items-center gap-2">✨ Magic Builder</h2>
+            <p class="text-sm text-gray-400 mb-6">Tell the AI what to build in front of you. (Keep it simple, e.g., "a small tree", "a red arch")</p>
+            
+            <input type="text" id="ai-prompt-input" placeholder="What should I build?..." class="w-full bg-gray-900 border border-gray-600 text-white rounded-lg p-3 mb-4 focus:outline-none focus:border-purple-500">
+            
+            <button id="ai-build-submit" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-4 rounded-lg w-full transition flex justify-center items-center gap-2" onclick="submitAIBuild()">
+                Generate Structure
+            </button>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-600 text-white px-6 py-3 rounded-full shadow-2xl transition-opacity duration-300 opacity-0 pointer-events-none z-[100] flex items-center gap-3">
+        <div id="toast-spinner" class="animate-spin rounded-full h-5 w-5 border-b-2 border-white hidden"></div>
+        <span id="toast-message">Notification</span>
+    </div>
+
+    <!-- SETTINGS MENU -->
+    <div id="settings-menu" class="absolute inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center pointer-auto z-[60]">
+        <div class="bg-gray-800 p-8 rounded-2xl border border-gray-700 w-96 max-w-full shadow-2xl">
+            <h2 class="text-2xl font-bold mb-6 text-white">Settings</h2>
+            
+            <div class="mb-4">
+                <label class="block text-sm mb-1 text-gray-300">Field of View (<span id="fov-val">75</span>)</label>
+                <input type="range" id="setting-fov" min="60" max="110" value="75" class="w-full accent-blue-500" oninput="updateSettings()">
+            </div>
+
+            <div class="mb-4">
+                <label class="block text-sm mb-1 text-gray-300">Mouse Sensitivity (<span id="sens-val">3</span>)</label>
+                <input type="range" id="setting-sens" min="1" max="10" step="1" value="3" class="w-full accent-blue-500" oninput="updateSettings()">
+            </div>
+            
+            <div class="mb-4 flex items-center justify-between text-gray-300">
+                <label class="text-sm">Invert Y Axis</label>
+                <input type="checkbox" id="setting-invert" class="w-5 h-5 accent-blue-500" onchange="updateSettings()">
+            </div>
+
+            <div class="mb-6 flex items-center justify-between text-gray-300">
+                <label class="text-sm">Graphics: High (Soft Shadows)</label>
+                <input type="checkbox" id="setting-shadows" checked class="w-5 h-5 accent-blue-500" onchange="updateSettings()">
+            </div>
+
+            <button class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg w-full transition" onclick="closeSettings()">Close</button>
+        </div>
+    </div>
+
+    <!-- DATA STORE AUTH OVERLAY -->
+    <div id="auth-overlay" class="fixed inset-0 bg-gray-900 z-[200] flex flex-col items-center justify-center">
+        <h1 class="text-5xl font-black italic tracking-tighter text-blue-400 mb-8 shadow-sm">MINI-BLOX</h1>
+        
+        <div id="auth-loading" class="text-white text-xl animate-pulse">Connecting to Data Store...</div>
+        
+        <div id="auth-register" class="bg-gray-800 p-8 rounded-2xl border border-gray-700 shadow-2xl w-96 hidden">
+            <h2 class="text-2xl font-bold mb-2 text-white">Create Account</h2>
+            <p class="text-sm text-gray-400 mb-6">Welcome! Choose a username to start playing and saving your avatar.</p>
+            
+            <input type="text" id="auth-username" placeholder="Username" class="w-full bg-gray-900 border border-gray-600 text-white rounded-lg p-3 mb-6 focus:outline-none focus:border-blue-500" maxlength="15">
+            
+            <button class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg w-full transition" onclick="createAccount()">Play Now</button>
+        </div>
+    </div>
+
+    <script>
+        // --- SYNTHESIZED SOUND EFFECTS ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playTone(freq, type, duration, vol=0.1) {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function sfxClick() { playTone(600, 'sine', 0.05, 0.05); }
+        function sfxJump() { 
+            playTone(300, 'sine', 0.1, 0.1); 
+            setTimeout(() => playTone(450, 'sine', 0.15, 0.1), 50); 
+        }
+        function sfxPlace() { playTone(200, 'square', 0.1, 0.05); }
+        function sfxDelete() { playTone(100, 'sawtooth', 0.15, 0.05); }
+
+        // Attach click sound to all buttons
+        document.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') sfxClick();
+        });
+
+
+        // --- UI & STATE LOGIC ---
+        let currentMode = null; // 'obby', 'sandbox', 'bridge', 'engine'
+        window.currentMode = null; // Export for multiplayer
+        let engineInitialized = false;
+
+        let gameSettings = {
+            fov: 75,
+            sensitivity: 0.003,
+            invertY: false,
+            shadows: true
+        };
+
+        let avatarSettings = {
+            face: 'smile',
+            skin: '#f1c27d',
+            shirt: '#0055ff',
+            pants: '#111111'
+        };
+
+        const faceEmojis = { smile: '🙂', cool: '😎', angry: '😠', surprised: '😲' };
+
+        function showTab(tab) {
+            document.getElementById('tab-discover').classList.add('hidden');
+            document.getElementById('tab-create').classList.add('hidden');
+            document.getElementById('tab-avatar').classList.add('hidden');
+            document.getElementById('tab-' + tab).classList.remove('hidden');
+        }
+
+        window.updateAvatarUIPreview = function() {
+            document.getElementById('avatar-skin').value = avatarSettings.skin;
+            document.getElementById('avatar-shirt').value = avatarSettings.shirt;
+            document.getElementById('avatar-pants').value = avatarSettings.pants;
+            document.getElementById('avatar-face').value = avatarSettings.face;
+
+            document.getElementById('prev-head').style.backgroundColor = avatarSettings.skin;
+            document.getElementById('prev-larm').style.backgroundColor = avatarSettings.skin;
+            document.getElementById('prev-rarm').style.backgroundColor = avatarSettings.skin;
+            document.getElementById('prev-torso').style.backgroundColor = avatarSettings.shirt;
+            document.getElementById('prev-lleg').style.backgroundColor = avatarSettings.pants;
+            document.getElementById('prev-rleg').style.backgroundColor = avatarSettings.pants;
+            
+            document.getElementById('prev-face').innerText = faceEmojis[avatarSettings.face];
+            document.getElementById('hub-avatar-icon').innerText = faceEmojis[avatarSettings.face];
+            document.getElementById('hub-avatar-icon').style.backgroundColor = avatarSettings.shirt;
+        };
+
+        window.updateAvatar3D = function() {
+            if (window.matSkin) window.matSkin.color.set(avatarSettings.skin);
+            if (window.matShirt) window.matShirt.color.set(avatarSettings.shirt);
+            if (window.matPants) window.matPants.color.set(avatarSettings.pants);
+            if (window.matFace && window.faceTextures) window.matFace.map = window.faceTextures[avatarSettings.face];
+        };
+
+        function saveAvatar() {
+            avatarSettings.face = document.getElementById('avatar-face').value;
+            avatarSettings.skin = document.getElementById('avatar-skin').value;
+            avatarSettings.shirt = document.getElementById('avatar-shirt').value;
+            avatarSettings.pants = document.getElementById('avatar-pants').value;
+            
+            // Update UI & 3D Model
+            window.updateAvatarUIPreview();
+            window.updateAvatar3D();
+
+            // Save to Data Store
+            if (window.saveProfileData) window.saveProfileData();
+        }
+
+        function openGameDetails(mode, title, desc, gradient) {
+            currentMode = mode;
+            document.getElementById('gd-title').innerText = title;
+            document.getElementById('gd-desc').innerText = desc;
+            document.getElementById('gd-img').className = `w-full md:w-1/2 h-64 md:h-auto bg-gradient-to-br ${gradient}`;
+            document.getElementById('game-details').classList.remove('hidden');
+            
+            document.getElementById('gd-play').onclick = () => launchGame(mode);
+        }
+
+        function closeGameDetails() {
+            document.getElementById('game-details').classList.add('hidden');
+        }
+
+        function launchGame(mode) {
+            currentMode = mode;
+            window.currentMode = mode;
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('game-details').classList.add('hidden');
+            document.getElementById('game-ui').classList.remove('hidden');
+            
+            if (mode === 'sandbox' || mode === 'engine') {
+                document.getElementById('hotbar').classList.remove('hidden');
+                document.getElementById('btn-ai-build').classList.remove('hidden');
+            } else {
+                document.getElementById('hotbar').classList.add('hidden');
+                document.getElementById('btn-ai-build').classList.add('hidden');
+            }
+
+            if (mode === 'engine') {
+                document.getElementById('editor-ui').classList.remove('hidden');
+                isStudioPlayMode = false;
+                document.getElementById('btn-studio-play').innerHTML = '▶ Play Here';
+                document.getElementById('btn-studio-play').className = 'text-green-400 hover:text-green-300 font-bold flex items-center gap-2 transition';
+                freeCamPos.set(0, 5, 10);
+            } else {
+                document.getElementById('editor-ui').classList.add('hidden');
+            }
+
+            if (!engineInitialized) {
+                initEngine();
+                engineInitialized = true;
+            }
+            
+            buildScene(mode);
+            if (mode !== 'engine') {
+                document.body.requestPointerLock();
+                document.getElementById('crosshair').style.display = 'block';
+            } else {
+                document.getElementById('crosshair').style.display = 'none';
+            }
+        }
+
+        function resumeGame() {
+            document.getElementById('pause-menu').classList.add('hidden');
+            document.body.requestPointerLock();
+        }
+
+        function leaveGame() {
+            document.getElementById('pause-menu').classList.add('hidden');
+            document.getElementById('game-ui').classList.add('hidden');
+            document.getElementById('editor-ui').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+            document.exitPointerLock();
+            currentMode = null;
+            window.currentMode = null;
+        }
+
+        function openSettings() {
+            document.getElementById('settings-menu').classList.remove('hidden');
+            if (document.pointerLockElement === document.body) {
+                document.exitPointerLock();
+            }
+        }
+
+        function closeSettings() {
+            document.getElementById('settings-menu').classList.add('hidden');
+            if (currentMode !== null && document.getElementById('pause-menu').classList.contains('hidden')) {
+                document.body.requestPointerLock();
+            }
+        }
+
+        // Pointer Lock Event Listener
+        document.addEventListener('pointerlockchange', () => {
+            if (document.pointerLockElement !== document.body && currentMode !== null && document.getElementById('settings-menu').classList.contains('hidden')) {
+                if (currentMode === 'engine' && !isStudioPlayMode) {
+                    // Do nothing, it's normal to be unlocked in engine edit mode
+                } else {
+                    // Esc was pressed
+                    document.getElementById('pause-menu').classList.remove('hidden');
+                }
+            }
+        });
+
+        // --- STUDIO LOGIC & BLOXSCRIPT ---
+        let isStudioPlayMode = false;
+        let freeCamPos = new THREE.Vector3(0, 5, 10);
+        let isRightMouseDown = false;
+
+        function toggleStudioPlay() {
+            isStudioPlayMode = !isStudioPlayMode;
+            const btn = document.getElementById('btn-studio-play');
+            if (isStudioPlayMode) {
+                // Switch to Testing Mode
+                btn.innerHTML = '⏹ Stop Testing';
+                btn.className = 'text-red-400 hover:text-red-300 font-bold flex items-center gap-2 transition';
+                player.position.copy(freeCamPos);
+                velocity.set(0, 0, 0);
+                cameraDistance = 10;
+                document.body.requestPointerLock();
+                document.getElementById('crosshair').style.display = 'block';
+            } else {
+                // Switch to Edit Mode
+                btn.innerHTML = '▶ Play Here';
+                btn.className = 'text-green-400 hover:text-green-300 font-bold flex items-center gap-2 transition';
+                freeCamPos.copy(camera.position); // Snap freecam to where player was looking
+                document.exitPointerLock();
+                document.getElementById('crosshair').style.display = 'none';
+            }
+        }
+
+        function switchStudioTab(tab) {
+            document.getElementById('view-explorer').classList.toggle('hidden', tab !== 'explorer');
+            document.getElementById('view-script').classList.toggle('hidden', tab !== 'script');
+            document.getElementById('tab-btn-explorer').className = `flex-1 p-3 font-bold transition ${tab === 'explorer' ? 'text-white bg-gray-700' : 'text-gray-400 hover:text-white'}`;
+            document.getElementById('tab-btn-script').className = `flex-1 p-3 font-bold transition ${tab === 'script' ? 'text-white bg-gray-700' : 'text-gray-400 hover:text-white'}`;
+        }
+
+        async function runBloxScript() {
+            const code = document.getElementById('blox-script-input').value;
+            const lines = code.split('\n');
+            let activeTarget = null;
+            
+            showToast("📜 Running BloxScript...", true);
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                if (!line || line.startsWith('//')) continue;
+                
+                const args = line.split(' ');
+                const cmd = args[0].toLowerCase();
+                
+                try {
+                    if (cmd === 'target') {
+                        const tx = parseFloat(args[1]), ty = parseFloat(args[2]), tz = parseFloat(args[3]);
+                        let closest = null, minDist = Infinity;
+                        
+                        for (let obj of objects) {
+                            if (obj.geometry.parameters.width > 100) continue; // Ignore giant floor
+                            const dist = obj.position.distanceTo(new THREE.Vector3(tx, ty, tz));
+                            if (dist < minDist && dist < 3) {
+                                closest = obj;
+                                minDist = dist;
+                            }
+                        }
+                        activeTarget = closest;
+                    } 
+                    else if (cmd === 'color' && activeTarget) {
+                        activeTarget.material.color.set(args[1]);
+                    }
+                    else if (cmd === 'move' && activeTarget) {
+                        activeTarget.position.x += parseFloat(args[1]);
+                        activeTarget.position.y += parseFloat(args[2]);
+                        activeTarget.position.z += parseFloat(args[3]);
+                    }
+                    else if (cmd === 'wait') {
+                        await new Promise(r => setTimeout(r, parseFloat(args[1]) * 1000));
+                    }
+                    else if (cmd === 'print') {
+                        showToast("🖨️ " + args.slice(1).join(' ').replace(/"/g, ''), false);
+                        await new Promise(r => setTimeout(r, 1000)); // Buffer print messages
+                    }
+                } catch (e) {
+                    console.error(`BloxScript Error at line ${i+1}:`, e);
+                }
+            }
+            setTimeout(() => showToast("📜 Script completed!", false), 500);
+            if (document.getElementById('pause-menu').classList.contains('hidden')) {
+                if (isStudioPlayMode || currentMode !== 'engine') {
+                    document.body.requestPointerLock();
+                }
+            }
+        }
+
+        // --- GEMINI API INTEGRATION ---
+        const apiKey = ""; // Runtime populated
+
+        async function fetchGeminiWithRetry(payload, retries = 5) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                    return await response.json();
+                } catch (err) {
+                    if (i === retries - 1) throw err;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+
+        function showToast(message, loading = false) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = message;
+            document.getElementById('toast-spinner').style.display = loading ? 'block' : 'none';
+            toast.classList.remove('opacity-0');
+            if (!loading) {
+                setTimeout(() => toast.classList.add('opacity-0'), 3000);
+            }
+        }
+
+        function hideToast() {
+            document.getElementById('toast').classList.add('opacity-0');
+        }
+
+        async function generateAIGameIdea() {
+            showToast("✨ Brainstorming new game...", true);
+            const payload = {
+                contents: [{ parts: [{ text: "Invent a new, highly clickable Mini-Blox / Roblox style game. Be creative! Return a title, a short 1-sentence description, and two hex colors to use for its gradient banner." }] }],
+                systemInstruction: { parts: [{ text: "You are an expert game designer. Only output valid JSON matching this schema: {\"title\": \"string\", \"description\": \"string\", \"color1\": \"string (hex)\", \"color2\": \"string (hex)\"}" }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            title: { type: "STRING" },
+                            description: { type: "STRING" },
+                            color1: { type: "STRING" },
+                            color2: { type: "STRING" }
+                        },
+                        required: ["title", "description", "color1", "color2"]
+                    }
+                }
+            };
+
+            try {
+                const data = await fetchGeminiWithRetry(payload);
+                const resultText = data.candidates[0].content.parts[0].text;
+                const gameIdea = JSON.parse(resultText);
+
+                // Add card to UI dynamically
+                const grid = document.getElementById('game-grid');
+                const players = Math.floor(Math.random() * 50000) + 100;
+                
+                const card = document.createElement('div');
+                card.className = "bg-gray-800 rounded-xl overflow-hidden cursor-pointer hover:scale-105 transition shadow-lg border border-purple-500 relative";
+                card.onclick = () => openGameDetails('sandbox', gameIdea.title, gameIdea.description, 'from-purple-600 to-indigo-600');
+                
+                card.innerHTML = `
+                    <div class="absolute top-2 right-2 bg-purple-600 text-xs font-bold px-2 py-1 rounded shadow z-10">✨ AI Generated</div>
+                    <div class="h-48" style="background: linear-gradient(to bottom right, ${gameIdea.color1}, ${gameIdea.color2})"></div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-xl mb-1">${gameIdea.title}</h3>
+                        <p class="text-sm text-gray-400 flex items-center gap-2">🟢 ${players.toLocaleString()} Playing</p>
+                    </div>
+                `;
+                grid.insertBefore(card, grid.firstChild);
+                showToast("✨ New game added to Discover!");
+
+            } catch (err) {
+                console.error(err);
+                showToast("❌ Failed to generate game.");
+            }
+        }
+
+        function openAIBuildModal() {
+            document.getElementById('pause-menu').classList.add('hidden');
+            document.getElementById('ai-build-modal').classList.remove('hidden');
+            document.getElementById('ai-prompt-input').focus();
+        }
+
+        function closeAIBuildModal() {
+            document.getElementById('ai-build-modal').classList.add('hidden');
+            document.getElementById('pause-menu').classList.remove('hidden');
+        }
+
+        async function submitAIBuild() {
+            const promptInput = document.getElementById('ai-prompt-input');
+            const prompt = promptInput.value.trim();
+            if (!prompt) return;
+
+            closeAIBuildModal();
+            resumeGame();
+            showToast(`✨ AI is building: "${prompt}"...`, true);
+
+            const payload = {
+                contents: [{ parts: [{ text: `Build: ${prompt}` }] }],
+                systemInstruction: { parts: [{ text: "You are a 3D voxel builder. The user wants a structure. Generate a list of 3D coordinates (blocks) to construct it. Keep it under 40 blocks total. X and Z should be between -5 and 5. Y should be between 0 and 10 (0 is ground level). Use a single hex color for all blocks, or mix colors if requested." }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            blocks: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        x: { type: "INTEGER" },
+                                        y: { type: "INTEGER" },
+                                        z: { type: "INTEGER" },
+                                        color: { type: "STRING" }
+                                    },
+                                    required: ["x", "y", "z", "color"]
+                                }
+                            }
+                        },
+                        required: ["blocks"]
+                    }
+                }
+            };
+
+            try {
+                const data = await fetchGeminiWithRetry(payload);
+                const resultText = data.candidates[0].content.parts[0].text;
+                const structure = JSON.parse(resultText);
+
+                // Calculate a spawn position slightly in front of the player
+                const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0,1,0), cameraYaw);
+                const spawnCenter = player.position.clone().add(forward.multiplyScalar(8));
+
+                // Spawn the AI blocks & save to DB
+                let blockCount = 0;
+                for (const block of structure.blocks) {
+                    const bx = Math.round(spawnCenter.x + block.x);
+                    const by = Math.round(block.y);
+                    const bz = Math.round(spawnCenter.z + block.z);
+                    const blockColor = new THREE.Color(block.color);
+                    const blockId = `${bx}_${by}_${bz}_${window.currentMode}`;
+
+                    setTimeout(() => {
+                        if (window.db && window.submitFirestoreBlock) {
+                            window.submitFirestoreBlock(blockId, bx, by, bz, blockColor.getHex());
+                        } else {
+                            createPart(bx, by, bz, blockColor, 1, 1, 1, blockId);
+                        }
+                    }, blockCount * 50);
+                    blockCount++;
+                }
+
+                setTimeout(() => { showToast(`✨ Built successfully! (${blockCount} blocks)`); }, blockCount * 50 + 500);
+
+            } catch (err) {
+                console.error(err);
+                showToast("❌ AI Build failed.");
+            }
+        }
+
+        function updateSettings() {
+            gameSettings.fov = parseInt(document.getElementById('setting-fov').value);
+            document.getElementById('fov-val').innerText = gameSettings.fov;
+            if (camera) {
+                camera.fov = gameSettings.fov;
+                camera.updateProjectionMatrix();
+            }
+
+            let sensRaw = parseInt(document.getElementById('setting-sens').value);
+            gameSettings.sensitivity = sensRaw * 0.001; 
+            document.getElementById('sens-val').innerText = sensRaw;
+            
+            gameSettings.invertY = document.getElementById('setting-invert').checked;
+            gameSettings.shadows = document.getElementById('setting-shadows').checked;
+
+            if (renderer) {
+                renderer.shadowMap.enabled = gameSettings.shadows;
+                if (scene) {
+                    scene.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = gameSettings.shadows;
+                            child.receiveShadow = gameSettings.shadows;
+                            if (child.material) child.material.needsUpdate = true;
+                        }
+                    });
+                }
+            }
+        }
+
+        // --- 3D ENGINE LOGIC ---
+        let scene, camera, renderer, clock, worldGroup;
+        let player, playerModel, limbs = {};
+        window.localPlayer = null; // Export for multiplayer sync
+        window.localPlayerModel = null;
+        window.gameScene = null;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let canJump = false, velocity = new THREE.Vector3();
+        let objects = []; // Interactable/collidable objects
+        let raycaster = new THREE.Raycaster();
+        let currentColor = new THREE.Color(0x34d399);
+        
+        let spawnPoint = new THREE.Vector3(0, 5, 0);
+        let currentPlatform = null;
+
+        // Camera Variables
+        let cameraDistance = 10;
+        let cameraPitch = 0.3; // Up/Down rotation
+        let cameraYaw = Math.PI; // Left/Right rotation
+
+        const GRAVITY = 40.0;
+        const SPEED = 18.0;
+        const JUMP = 18.0;
+
+        // Texture Generator
+        function createStudTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,64,64);
+            ctx.beginPath(); ctx.arc(32, 32, 16, 0, Math.PI * 2);
+            ctx.fillStyle = '#eeeeee'; ctx.fill();
+            ctx.strokeStyle = '#dddddd'; ctx.lineWidth = 3; ctx.stroke();
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+            return tex;
+        }
+        const studTexture = createStudTexture();
+
+        // High-Quality Face Texture Generator
+        function createFaceTexture(faceType) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'transparent'; ctx.fillRect(0,0,128,128);
+            ctx.fillStyle = '#000000'; ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 6; ctx.lineCap = 'round';
+
+            if (faceType === 'smile') {
+                ctx.beginPath(); ctx.arc(40, 50, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(88, 50, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(64, 75, 20, 0, Math.PI, false); ctx.stroke();
+            } else if (faceType === 'cool') {
+                ctx.fillRect(25, 45, 30, 15); ctx.fillRect(73, 45, 30, 15); ctx.fillRect(55, 50, 18, 5);
+                ctx.beginPath(); ctx.moveTo(50, 80); ctx.lineTo(80, 75); ctx.stroke();
+            } else if (faceType === 'angry') {
+                ctx.beginPath(); ctx.arc(40, 60, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(88, 60, 8, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(25, 45); ctx.lineTo(50, 55); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(103, 45); ctx.lineTo(78, 55); ctx.stroke();
+                ctx.beginPath(); ctx.arc(64, 85, 10, Math.PI, 0, false); ctx.stroke();
+            } else if (faceType === 'surprised') {
+                ctx.beginPath(); ctx.arc(40, 50, 6, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(88, 50, 6, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(64, 80, 12, 0, Math.PI*2); ctx.stroke();
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.transparent = true;
+            return tex;
+        }
+
+        // Cache face textures to save performance
+        window.faceTextures = {
+            smile: createFaceTexture('smile'),
+            cool: createFaceTexture('cool'),
+            angry: createFaceTexture('angry'),
+            surprised: createFaceTexture('surprised')
+        };
+
+        function initEngine() {
+            scene = new THREE.Scene();
+            window.gameScene = scene; // Export scene
+            worldGroup = new THREE.Group();
+            scene.add(worldGroup);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.fov = gameSettings.fov;
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2x for performance
+            renderer.shadowMap.enabled = gameSettings.shadows;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer, more realistic shadows
+            renderer.outputEncoding = THREE.sRGBEncoding; // Better color rendering
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; // Cinematic lighting tone mapping
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            // Lighting (Adjusted for ACESFilmic ToneMapping)
+            const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.5);
+            scene.add(hemi);
+
+            const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+            sun.shadow.camera.top = 100;
+            sun.shadow.camera.bottom = -100;
+            sun.shadow.camera.near = 0.5;
+            sun.shadow.camera.far = 500;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            scene.add(sun);
+
+            createCharacter();
+            setupControls();
+
+            window.addEventListener('resize', onWindowResize);
+            animate();
+        }
+
+        function createCharacter() {
+            player = new THREE.Group();
+            playerModel = new THREE.Group();
+            player.add(playerModel);
+            scene.add(player);
+
+            window.localPlayer = player;
+            window.localPlayerModel = playerModel;
+
+            // Global references so the avatar menu can update them dynamically
+            window.matSkin = new THREE.MeshStandardMaterial({ color: avatarSettings.skin, roughness: 0.4, metalness: 0.1 });
+            window.matShirt = new THREE.MeshStandardMaterial({ color: avatarSettings.shirt, roughness: 0.6, metalness: 0.1 });
+            window.matPants = new THREE.MeshStandardMaterial({ color: avatarSettings.pants, roughness: 0.7, metalness: 0.1 });
+            window.matFace = new THREE.MeshBasicMaterial({ map: window.faceTextures[avatarSettings.face], transparent: true });
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.5), window.matShirt);
+            torso.position.y = 1.6; torso.castShadow = true; playerModel.add(torso);
+
+            const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), window.matSkin);
+            head.position.y = 2.5; head.castShadow = true; playerModel.add(head);
+
+            // Decal plane for the dynamic face
+            const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), window.matFace);
+            faceMesh.position.set(0, 0, 0.301); // Slightly in front of the head
+            head.add(faceMesh);
+
+            const limbGeo = new THREE.BoxGeometry(0.4, 1.2, 0.4);
+            limbs.lArm = new THREE.Mesh(limbGeo, window.matSkin); limbs.lArm.position.set(-0.75, 1.6, 0); playerModel.add(limbs.lArm);
+            limbs.rArm = new THREE.Mesh(limbGeo, window.matSkin); limbs.rArm.position.set(0.75, 1.6, 0); playerModel.add(limbs.rArm);
+            limbs.lLeg = new THREE.Mesh(limbGeo, window.matPants); limbs.lLeg.position.set(-0.25, 0.6, 0); playerModel.add(limbs.lLeg);
+            limbs.rLeg = new THREE.Mesh(limbGeo, window.matPants); limbs.rLeg.position.set(0.25, 0.6, 0); playerModel.add(limbs.rLeg);
+            
+            // Give shadows to limbs
+            Object.values(limbs).forEach(l => {
+                l.castShadow = gameSettings.shadows;
+                l.receiveShadow = gameSettings.shadows;
+            });
+        }
+
+        // Helper to spawn blocks in the world
+        function createPart(x, y, z, color, w=1, h=1, d=1, id=null, userDataObj={}) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            // Repeat texture based on size
+            const tex = studTexture.clone();
+            tex.needsUpdate = true;
+            tex.repeat.set(w, d);
+
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: color, 
+                map: tex,
+                roughness: 0.3, // Shinier plastic look for blocks
+                metalness: 0.1 
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            // Center alignment fixes
+            mesh.position.set(x, y + h/2, z);
+            mesh.castShadow = gameSettings.shadows;
+            mesh.receiveShadow = gameSettings.shadows;
+            mesh.userData = { id: id, ...userDataObj }; // Store unique multiplayer block ID and game logic
+            worldGroup.add(mesh);
+            objects.push(mesh);
+            return mesh;
+        }
+
+        function resetPlayer() {
+            player.position.copy(spawnPoint);
+            velocity.set(0,0,0);
+            cameraYaw = Math.PI;
+            cameraPitch = 0.3;
+            currentPlatform = null;
+        }
+
+        function buildScene(mode) {
+            // Clear previous level
+            while(worldGroup.children.length > 0){ 
+                worldGroup.remove(worldGroup.children[0]); 
+            }
+            objects = [];
+            spawnPoint.set(0, 5, 0); // Reset default spawn
+            resetPlayer();
+
+            // Replay chat history for this mode
+            const chatMsgs = document.getElementById('chat-messages');
+            chatMsgs.innerHTML = '';
+            if (window.chatMessagesCache) {
+                window.chatMessagesCache.forEach(data => {
+                    if (data.mode === mode && Date.now() - data.timestamp < 3600000) {
+                        const msgEl = document.createElement('div');
+                        msgEl.innerHTML = `<span class="font-bold text-blue-300">[${data.sender}]</span> <span class="break-words">${data.text}</span>`;
+                        chatMsgs.appendChild(msgEl);
+                    }
+                });
+            }
+
+            // Spawn Mode Baselines
+            if (mode === 'sandbox' || mode === 'engine') {
+                scene.background = new THREE.Color(0x87CEEB); // Sky blue
+                scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+                // Big flat floor
+                createPart(0, -1, 0, 0x44aa44, 200, 1, 200);
+                // Spawn Pad
+                createPart(0, 0, 0, 0x888888, 6, 0.2, 6);
+
+            } else if (mode === 'obby') {
+                scene.background = new THREE.Color(0x1a0b2e); // Space/Dark theme
+                scene.fog = new THREE.FogExp2(0x1a0b2e, 0.015);
+                
+                // Start Platform
+                createPart(0, 0, 0, 0x4ade80, 10, 1, 10, null, { type: 'checkpoint', spawn: new THREE.Vector3(0, 5, 0) });
+                
+                // Basic Jumps
+                createPart(0, 0, -12, 0x3b82f6, 4, 1, 4);
+                createPart(0, 1, -22, 0x3b82f6, 3, 1, 3);
+                createPart(6, 2, -30, 0x3b82f6, 3, 1, 3);
+                
+                // Lava Jump Section (Red kills you!)
+                createPart(6, 1, -40, 0xef4444, 16, 1, 16, null, { type: 'kill' }); // Lava pit
+                createPart(6, 3, -37, 0xf59e0b, 2, 1, 2);
+                createPart(6, 4, -43, 0xf59e0b, 2, 1, 2);
+                
+                // Checkpoint 1
+                createPart(6, 5, -53, 0x22c55e, 6, 1, 6, null, { type: 'checkpoint', spawn: new THREE.Vector3(6, 10, -53) });
+
+                // Moving Platforms Over Void
+                createPart(6, 5, -65, 0x8b5cf6, 4, 1, 4, null, { type: 'moving', startX: -5, endX: 17, speed: 1.5, offset: 0 });
+                createPart(6, 5, -78, 0x8b5cf6, 4, 1, 4, null, { type: 'moving', startX: 17, endX: -5, speed: 1.5, offset: Math.PI });
+                
+                // Tightrope Beams
+                createPart(6, 5, -92, 0x3b82f6, 1, 1, 10);
+                createPart(6, 6, -104, 0x3b82f6, 1, 1, 10);
+                
+                // Final Checkpoint/Win Area
+                createPart(6, 7, -118, 0xa855f7, 12, 1, 12, null, { type: 'checkpoint', spawn: new THREE.Vector3(6, 12, -118) });
+                // Winner Trophy Stand
+                createPart(6, 8, -118, 0xfacc15, 2, 2, 2);
+
+            } else if (mode === 'bridge') {
+                scene.background = new THREE.Color(0x000000);
+                scene.fog = new THREE.FogExp2(0x000000, 0.02);
+                
+                createPart(0, 0, 0, 0x888888, 10, 1, 10, null, { type: 'checkpoint', spawn: new THREE.Vector3(0, 5, 0) }); // Start
+                
+                // Generate Squid Game style Glass bridge
+                for(let i=0; i<15; i++) {
+                    let z = -10 - (i * 8);
+                    let safeLeft = Math.random() > 0.5;
+                    // Left panel
+                    createPart(-3.5, 0, z, 0x60a5fa, 5, 0.5, 5, null, { type: 'glass', isSafe: safeLeft, falling: false });
+                    // Right panel
+                    createPart(3.5, 0, z, 0x60a5fa, 5, 0.5, 5, null, { type: 'glass', isSafe: !safeLeft, falling: false });
+                }
+                
+                createPart(0, 0, -135, 0x4ade80, 10, 1, 10, null, { type: 'checkpoint', spawn: new THREE.Vector3(0, 5, -135) }); // End
+            }
+
+            // Spawn Synced Multiplayer Blocks
+            if (window.multiplayerBlocks) {
+                Object.values(window.multiplayerBlocks).forEach(data => {
+                    if (data.mode === mode) {
+                        createPart(data.x, data.y, data.z, data.color, 1, 1, 1, `${data.x}_${data.y}_${data.z}_${data.mode}`);
+                    }
+                });
+            }
+        }
+
+        function setupControls() {
+            // Right click tracker for camera panning in studio
+            document.addEventListener('mousedown', (e) => {
+                if (e.button === 2) isRightMouseDown = true;
+            });
+            document.addEventListener('mouseup', (e) => {
+                if (e.button === 2) isRightMouseDown = false;
+            });
+            document.addEventListener('contextmenu', e => {
+                if (currentMode === 'engine' && !isStudioPlayMode) e.preventDefault();
+            });
+
+            // Mouse Look
+            document.addEventListener('mousemove', (e) => {
+                const isLocked = document.pointerLockElement === document.body;
+                const isEnginePan = currentMode === 'engine' && !isStudioPlayMode && isRightMouseDown;
+
+                if (isLocked || isEnginePan) {
+                    cameraYaw -= e.movementX * gameSettings.sensitivity;
+                    
+                    // Standard non-inverted control
+                    if (gameSettings.invertY) {
+                        cameraPitch -= e.movementY * gameSettings.sensitivity;
+                    } else {
+                        cameraPitch += e.movementY * gameSettings.sensitivity;
+                    }
+
+                    // Improved Pitch: Allow looking straight up and down
+                    cameraPitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, cameraPitch));
+                }
+            });
+
+            // Keyboard Handling (Movement & Chat)
+            document.addEventListener('keydown', (e) => {
+                const chatInput = document.getElementById('chat-input');
+                const chatMessages = document.getElementById('chat-messages');
+
+                // Toggle Chat Box
+                if (e.code === 'Enter') {
+                    if (document.activeElement === chatInput) {
+                        // Send Chat Message
+                        const msg = chatInput.value.trim();
+                        if (msg && window.db && window.userId && window.submitChatMsg) {
+                            window.submitChatMsg(msg);
+                        }
+                        chatInput.value = '';
+                        chatInput.blur();
+                        chatMessages.classList.add('hidden');
+                        
+                        // Re-lock pointer if we are in active game
+                        if (currentMode !== null && (currentMode !== 'engine' || isStudioPlayMode)) {
+                            document.body.requestPointerLock();
+                        }
+                    } else if ((document.pointerLockElement === document.body || (currentMode === 'engine' && !isStudioPlayMode)) && currentMode !== null) {
+                        // Open Chat Box
+                        document.exitPointerLock();
+                        chatMessages.classList.remove('hidden');
+                        chatInput.focus();
+                        e.preventDefault(); 
+                    }
+                }
+
+                // Disable movement keys if the user is typing in a script box or chat
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+                
+                switch(e.code) {
+                    case 'KeyW': moveForward = true; break;
+                    case 'KeyS': moveBackward = true; break;
+                    case 'KeyA': moveLeft = true; break;
+                    case 'KeyD': moveRight = true; break;
+                    case 'Space': 
+                        if(canJump) { 
+                            velocity.y = JUMP; 
+                            canJump = false; 
+                            sfxJump(); 
+                        } 
+                        break;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+                
+                switch(e.code) {
+                    case 'KeyW': moveForward = false; break;
+                    case 'KeyS': moveBackward = false; break;
+                    case 'KeyA': moveLeft = false; break;
+                    case 'KeyD': moveRight = false; break;
+                }
+            });
+
+            // Color Selection for Sandbox
+            document.querySelectorAll('.slot').forEach(slot => {
+                slot.onclick = () => {
+                    document.querySelectorAll('.slot').forEach(s => s.classList.remove('active'));
+                    slot.classList.add('active');
+                    currentColor = new THREE.Color(slot.dataset.color);
+                };
+            });
+
+            // Multiplayer Building System
+            document.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return; // Only build on left click
+                if (currentMode !== 'sandbox' && currentMode !== 'engine') return;
+                
+                const isLocked = document.pointerLockElement === document.body;
+                const isEngineUnlocked = currentMode === 'engine' && !isStudioPlayMode;
+
+                if (!isLocked && !isEngineUnlocked) return;
+                
+                // Prevent building if clicking on UI menus while unlocked
+                if (isEngineUnlocked && e.target !== renderer.domElement) return;
+
+                if (isEngineUnlocked) {
+                    const mouse = new THREE.Vector2();
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                } else {
+                    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+                }
+
+                const intersects = raycaster.intersectObjects(objects);
+
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    if (e.shiftKey) {
+                        // Delete Block
+                        if (hit.object.geometry.parameters.width < 100) { 
+                            if (window.db && hit.object.userData.id && window.deleteFirestoreBlock) {
+                                // Real-time network delete
+                                window.deleteFirestoreBlock(hit.object.userData.id);
+                            } else {
+                                // Fallback local delete (e.g. Obby elements with no ID)
+                                worldGroup.remove(hit.object);
+                                objects.splice(objects.indexOf(hit.object), 1);
+                                sfxDelete(); 
+                            }
+                        }
+                    } else {
+                        // Place Block
+                        const normal = hit.face.normal.clone().applyQuaternion(hit.object.quaternion);
+                        const pos = hit.point.clone().add(normal.multiplyScalar(0.5));
+                        
+                        const bx = Math.round(pos.x);
+                        const by = Math.round(pos.y - 0.5);
+                        const bz = Math.round(pos.z);
+                        const blockId = `${bx}_${by}_${bz}_${window.currentMode}`;
+
+                        if (window.db && window.submitFirestoreBlock) {
+                            // Real-time network sync
+                            window.submitFirestoreBlock(blockId, bx, by, bz, currentColor.getHex());
+                        } else {
+                            createPart(bx, by, bz, currentColor, 1, 1, 1, blockId);
+                            sfxPlace();
+                        }
+                    }
+                }
+            });
+        }
+
+        // Extremely basic AABB Collision for Floor detection only
+        function checkFloorCollision() {
+            player.updateMatrixWorld();
+            let feetY = player.position.y;
+            let onGround = false;
+            let highestFloor = -Infinity;
+            let steppedObject = null;
+
+            for (let obj of objects) {
+                if (obj.userData.falling) continue; // Ignore falling glass
+
+                // Ignore very thin walls for feet collision
+                let box = new THREE.Box3().setFromObject(obj);
+                // Check if player X/Z is inside the box X/Z
+                if (player.position.x > box.min.x - 0.4 && player.position.x < box.max.x + 0.4 &&
+                    player.position.z > box.min.z - 0.4 && player.position.z < box.max.z + 0.4) {
+                    
+                    // Check if player feet are exactly at or slightly below the top of this box
+                    if (feetY >= box.max.y - 0.5 && feetY <= box.max.y + 0.5) {
+                        if (box.max.y > highestFloor) {
+                            highestFloor = box.max.y;
+                            steppedObject = obj;
+                        }
+                        onGround = true;
+                    }
+                }
+            }
+
+            if (onGround && velocity.y <= 0) {
+                player.position.y = highestFloor;
+                velocity.y = 0;
+                canJump = true;
+                
+                // --- GAME MECHANICS TRIGGER ---
+                if (steppedObject) {
+                    // Kill Bricks (Lava)
+                    if (steppedObject.userData.type === 'kill') {
+                        sfxDelete(); // Death sound
+                        resetPlayer();
+                        return; // Stop processing frame
+                    }
+                    // Checkpoints
+                    if (steppedObject.userData.type === 'checkpoint' && steppedObject.userData.spawn) {
+                        spawnPoint.copy(steppedObject.userData.spawn);
+                        steppedObject.material.color.setHex(0x22c55e); // Turn bright green to indicate saved
+                    }
+                    // Breakable Glass
+                    if (steppedObject.userData.type === 'glass' && !steppedObject.userData.isSafe) {
+                        steppedObject.userData.falling = true;
+                        sfxDelete(); // Glass break sound
+                    }
+                    // Moving Platforms
+                    if (steppedObject.userData.type === 'moving') {
+                        currentPlatform = steppedObject;
+                    } else {
+                        currentPlatform = null;
+                    }
+                }
+            } else {
+                currentPlatform = null;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!engineInitialized) return;
+
+            const delta = Math.min(clock.getDelta(), 0.1); // Cap delta to prevent huge jumps
+            const time = clock.getElapsedTime();
+
+            if ((document.pointerLockElement === document.body && currentMode !== null) || (currentMode === 'engine' && !isStudioPlayMode)) {
+                
+                if (currentMode === 'engine' && !isStudioPlayMode) {
+                    // --- FREECAM EDIT MODE ---
+                    player.visible = false;
+                    
+                    // Direct camera view calculation
+                    const lookX = freeCamPos.x - Math.sin(cameraYaw) * Math.cos(cameraPitch);
+                    const lookY = freeCamPos.y - Math.sin(cameraPitch);
+                    const lookZ = freeCamPos.z - Math.cos(cameraYaw) * Math.cos(cameraPitch);
+                    
+                    camera.position.copy(freeCamPos);
+                    camera.lookAt(lookX, lookY, lookZ);
+
+                    // Freecam Movement
+                    const speed = 40.0 * delta;
+                    const forward = new THREE.Vector3();
+                    camera.getWorldDirection(forward);
+                    const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+
+                    if (moveForward) freeCamPos.add(forward.clone().multiplyScalar(speed));
+                    if (moveBackward) freeCamPos.add(forward.clone().multiplyScalar(-speed));
+                    if (moveRight) freeCamPos.add(right.clone().multiplyScalar(speed));
+                    if (moveLeft) freeCamPos.add(right.clone().multiplyScalar(-speed));
+
+                } else {
+                    // --- NORMAL THIRD PERSON GAMEPLAY ---
+                    player.visible = true;
+
+                    // Apply Gravity
+                    velocity.y -= GRAVITY * delta;
+                    player.position.y += velocity.y * delta;
+
+                    // Basic custom collision check
+                    checkFloorCollision();
+
+                    // Death Mechanic (Fell off map)
+                    if (player.position.y < -20) {
+                        resetPlayer();
+                    }
+
+                    // Movement Logic relative to Camera Yaw
+                    const moveDir = new THREE.Vector3();
+                    if (moveForward) moveDir.z -= 1;
+                    if (moveBackward) moveDir.z += 1;
+                    if (moveLeft) moveDir.x -= 1;
+                    if (moveRight) moveDir.x += 1;
+
+                    if (moveDir.length() > 0) {
+                        moveDir.normalize();
+                        // Rotate movement vector by camera's Yaw
+                        moveDir.applyAxisAngle(new THREE.Vector3(0,1,0), cameraYaw);
+                        
+                        player.position.add(moveDir.multiplyScalar(SPEED * delta));
+
+                        // Smooth character rotation
+                        const targetRotation = Math.atan2(moveDir.x, moveDir.z);
+                        // Handle wrap-around interpolation
+                        let diff = targetRotation - playerModel.rotation.y;
+                        while (diff < -Math.PI) diff += Math.PI * 2;
+                        while (diff > Math.PI) diff -= Math.PI * 2;
+                        playerModel.rotation.y += diff * 10 * delta;
+
+                        // Walk Animation
+                        const walkSpeed = 15;
+                        const walkAmount = 0.6;
+                        limbs.lArm.rotation.x = Math.sin(time * walkSpeed) * walkAmount;
+                        limbs.rArm.rotation.x = -Math.sin(time * walkSpeed) * walkAmount;
+                        limbs.lLeg.rotation.x = -Math.sin(time * walkSpeed) * walkAmount;
+                        limbs.rLeg.rotation.x = Math.sin(time * walkSpeed) * walkAmount;
+                    } else {
+                        // Idle Reset
+                        limbs.lArm.rotation.x = THREE.MathUtils.lerp(limbs.lArm.rotation.x, 0, 10 * delta);
+                        limbs.rArm.rotation.x = THREE.MathUtils.lerp(limbs.rArm.rotation.x, 0, 10 * delta);
+                        limbs.lLeg.rotation.x = THREE.MathUtils.lerp(limbs.lLeg.rotation.x, 0, 10 * delta);
+                        limbs.rLeg.rotation.x = THREE.MathUtils.lerp(limbs.rLeg.rotation.x, 0, 10 * delta);
+                    }
+
+                    // Dynamic Third-Person Camera Logic
+                    const camX = player.position.x + cameraDistance * Math.sin(cameraYaw) * Math.cos(cameraPitch);
+                    const camY = player.position.y + 1.5 + cameraDistance * Math.sin(cameraPitch);
+                    const camZ = player.position.z + cameraDistance * Math.cos(cameraYaw) * Math.cos(cameraPitch);
+
+                    camera.position.set(camX, camY, camZ);
+                    camera.lookAt(player.position.x, player.position.y + 1.5, player.position.z);
+                }
+            }
+
+            // Animate moving and falling level objects
+            for (let obj of objects) {
+                if (obj.userData.type === 'moving') {
+                    const oldX = obj.position.x;
+                    obj.position.x = obj.userData.startX + Math.sin(time * obj.userData.speed + obj.userData.offset) * (obj.userData.endX - obj.userData.startX);
+                    const deltaX = obj.position.x - oldX;
+                    
+                    // If player is standing on it, drag them along
+                    if (currentPlatform === obj && player.visible) {
+                        player.position.x += deltaX;
+                    }
+                }
+                if (obj.userData.falling) {
+                    obj.position.y -= 15 * delta; // Fall down into the void
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            if(!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+
+    <!-- MULTIPLAYER LOGIC & CLOUD STORAGE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, deleteDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Environment variables
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'miniblox-default';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        window.db = null;
+        window.userId = null;
+        window.currentUsername = "Guest";
+        window.multiplayerBlocks = {};
+        window.chatMessagesCache = [];
+        
+        let db, auth, userId;
+        const remotePlayers = {};
+
+        async function initMultiplayer() {
+            if (!firebaseConfig) {
+                console.log("No Firebase config found. Running in single-player mode.");
+                document.getElementById('auth-overlay').classList.add('hidden');
+                document.getElementById('main-menu').classList.remove('hidden');
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            window.db = db;
+
+            // Auth Rule: Must authenticate BEFORE any queries
+            if (initialAuthToken) {
+                await signInWithCustomToken(auth, initialAuthToken);
+            } else {
+                await signInAnonymously(auth);
+            }
+            userId = auth.currentUser.uid;
+            window.userId = userId;
+
+            // DATA STORE: Load User Profile
+            const profileRef = doc(db, 'artifacts', appId, 'users', userId, 'profile', 'main');
+            try {
+                const snap = await getDoc(profileRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    window.currentUsername = data.username;
+                    document.getElementById('nav-username').innerText = data.username;
+                    if (data.avatar) {
+                        // Apply saved avatar
+                        avatarSettings = data.avatar;
+                        window.updateAvatarUIPreview();
+                        window.updateAvatar3D();
+                    }
+                    // Hide Overlay, enter Hub
+                    document.getElementById('auth-overlay').classList.add('hidden');
+                    document.getElementById('main-menu').classList.remove('hidden');
+                } else {
+                    // New User: Show Account Creation
+                    document.getElementById('auth-loading').classList.add('hidden');
+                    document.getElementById('auth-register').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Data store error:", err);
+                document.getElementById('auth-overlay').classList.add('hidden');
+                document.getElementById('main-menu').classList.remove('hidden');
+            }
+            
+            // MULTIPLAYER SYNC: Players & Avatars
+            const playersRef = collection(db, 'artifacts', appId, 'public', 'data', 'players');
+            onSnapshot(playersRef, (snapshot) => {
+                if (!window.gameScene) return;
+
+                snapshot.docChanges().forEach((change) => {
+                    const id = change.doc.id;
+                    const data = change.doc.data();
+
+                    if (id === userId) return; // Skip ourselves
+
+                    if (change.type === 'added' || change.type === 'modified') {
+                        // Cleanup stale players (inactive for > 15 seconds)
+                        if (Date.now() - data.timestamp > 15000) {
+                            if (remotePlayers[id]) {
+                                window.gameScene.remove(remotePlayers[id].mesh);
+                                delete remotePlayers[id];
+                            }
+                            return;
+                        }
+
+                        if (!remotePlayers[id]) {
+                            // Create dummy player avatar for the remote player
+                            const dummyGroup = new THREE.Group();
+                            
+                            // Use remote player's synced avatar colors & face
+                            const remoteFace = data.face || 'smile';
+                            const remoteSkin = data.skin || '#f1c27d';
+                            const remoteShirt = data.shirt || '#ef4444';
+                            const remotePants = data.pants || '#111111';
+
+                            const matSkin = new THREE.MeshStandardMaterial({ color: remoteSkin, roughness: 0.4 });
+                            const matShirt = new THREE.MeshStandardMaterial({ color: remoteShirt, roughness: 0.6 });
+                            const matPants = new THREE.MeshStandardMaterial({ color: remotePants, roughness: 0.7 });
+                            const matFace = new THREE.MeshBasicMaterial({ map: window.faceTextures[remoteFace] || window.faceTextures['smile'], transparent: true });
+                            
+                            const torso = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 0.5), matShirt);
+                            torso.position.y = 1.6; torso.castShadow = true;
+
+                            const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), matSkin);
+                            head.position.y = 2.5; head.castShadow = true;
+                            
+                            const faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), matFace);
+                            faceMesh.position.set(0, 0, 0.301);
+                            head.add(faceMesh);
+
+                            const rLimbs = {
+                                lArm: new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), matSkin),
+                                rArm: new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), matSkin),
+                                lLeg: new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), matPants),
+                                rLeg: new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), matPants)
+                            };
+                            
+                            rLimbs.lArm.position.set(-0.75, 1.6, 0);
+                            rLimbs.rArm.position.set(0.75, 1.6, 0);
+                            rLimbs.lLeg.position.set(-0.25, 0.6, 0);
+                            rLimbs.rLeg.position.set(0.25, 0.6, 0);
+
+                            Object.values(rLimbs).forEach(l => { l.castShadow = true; dummyGroup.add(l); });
+
+                            dummyGroup.add(torso);
+                            dummyGroup.add(head);
+                            
+                            window.gameScene.add(dummyGroup);
+                            remotePlayers[id] = { mesh: dummyGroup, limbs: rLimbs, faceMat: matFace, targetPos: new THREE.Vector3(), targetRot: 0 };
+                        } else {
+                            // Update dynamic face if they change it while playing
+                            if (remotePlayers[id].faceMat && data.face) {
+                                remotePlayers[id].faceMat.map = window.faceTextures[data.face] || window.faceTextures['smile'];
+                            }
+                        }
+
+                        // Only show players who are in the same game mode as us
+                        remotePlayers[id].mesh.visible = (data.mode === window.currentMode);
+
+                        // Update target positions for smooth lerping
+                        remotePlayers[id].targetPos.set(data.x, data.y, data.z);
+                        remotePlayers[id].targetRot = data.rot;
+                    }
+                    if (change.type === 'removed') {
+                        if (remotePlayers[id]) {
+                            window.gameScene.remove(remotePlayers[id].mesh);
+                            delete remotePlayers[id];
+                        }
+                    }
+                });
+            }, (error) => {
+                console.error("Firestore Multiplayer Error:", error);
+            });
+
+            // MULTIPLAYER SYNC: Blocks & Building
+            const blocksRef = collection(db, 'artifacts', appId, 'public', 'data', 'blocks');
+            onSnapshot(blocksRef, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    const id = change.doc.id;
+                    const data = change.doc.data();
+                    
+                    if (change.type === 'added' || change.type === 'modified') {
+                        window.multiplayerBlocks[id] = data;
+                        if (data.mode === window.currentMode && window.gameScene) {
+                            if (!objects.find(o => o.userData && o.userData.id === id)) {
+                                createPart(data.x, data.y, data.z, data.color, 1, 1, 1, id);
+                                if (data.timestamp > Date.now() - 5000) sfxPlace(); // Only sound recent blocks
+                            }
+                        }
+                    }
+                    if (change.type === 'removed') {
+                        delete window.multiplayerBlocks[id];
+                        if (data.mode === window.currentMode && window.gameScene) {
+                            const obj = objects.find(o => o.userData && o.userData.id === id);
+                            if (obj) {
+                                worldGroup.remove(obj);
+                                objects.splice(objects.indexOf(obj), 1);
+                                if (data.timestamp > Date.now() - 5000) sfxDelete();
+                            }
+                        }
+                    }
+                });
+            });
+
+            // MULTIPLAYER SYNC: Chat system
+            const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+            onSnapshot(chatRef, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const data = change.doc.data();
+                        window.chatMessagesCache.push(data);
+                        
+                        // Display if same mode and recent (within last 1 hour)
+                        if (data.mode === window.currentMode && Date.now() - data.timestamp < 3600000) {
+                            displayChatMessage(data.sender, data.text);
+                        }
+                    }
+                });
+            });
+
+            // Local Player Sync Loop (Sends position to Firestore)
+            setInterval(() => {
+                if (!window.localPlayer || !window.localPlayerModel || window.currentMode === null) return;
+                
+                setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', userId), {
+                    x: window.localPlayer.position.x,
+                    y: window.localPlayer.position.y,
+                    z: window.localPlayer.position.z,
+                    rot: window.localPlayerModel.rotation.y,
+                    face: avatarSettings.face,
+                    skin: avatarSettings.skin,
+                    shirt: avatarSettings.shirt,
+                    pants: avatarSettings.pants,
+                    mode: window.currentMode,
+                    timestamp: Date.now()
+                });
+            }, 100);
+
+            // Interpolation Loop for smooth movement of remote players
+            function animateRemotePlayers() {
+                requestAnimationFrame(animateRemotePlayers);
+                const time = Date.now() * 0.001;
+                
+                for (const id in remotePlayers) {
+                    const rp = remotePlayers[id];
+                    if (rp.mesh && rp.targetPos && rp.mesh.visible) {
+                        
+                        // Calculate movement for walking animation
+                        const distMoved = rp.mesh.position.distanceTo(rp.targetPos);
+                        
+                        rp.mesh.position.lerp(rp.targetPos, 0.2); // Smoothly glide to the newest position
+                        rp.mesh.rotation.y = THREE.MathUtils.lerp(rp.mesh.rotation.y, rp.targetRot, 0.2);
+
+                        // Animate multiplayer dummy limbs if they are moving
+                        if (distMoved > 0.05 && rp.limbs) {
+                            const walkSpeed = 15;
+                            const walkAmount = 0.6;
+                            rp.limbs.lArm.rotation.x = Math.sin(time * walkSpeed) * walkAmount;
+                            rp.limbs.rArm.rotation.x = -Math.sin(time * walkSpeed) * walkAmount;
+                            rp.limbs.lLeg.rotation.x = -Math.sin(time * walkSpeed) * walkAmount;
+                            rp.limbs.rLeg.rotation.x = Math.sin(time * walkSpeed) * walkAmount;
+                        } else if (rp.limbs) {
+                            rp.limbs.lArm.rotation.x = THREE.MathUtils.lerp(rp.limbs.lArm.rotation.x, 0, 0.1);
+                            rp.limbs.rArm.rotation.x = THREE.MathUtils.lerp(rp.limbs.rArm.rotation.x, 0, 0.1);
+                            rp.limbs.lLeg.rotation.x = THREE.MathUtils.lerp(rp.limbs.lLeg.rotation.x, 0, 0.1);
+                            rp.limbs.rLeg.rotation.x = THREE.MathUtils.lerp(rp.limbs.rLeg.rotation.x, 0, 0.1);
+                        }
+                    }
+                }
+            }
+            animateRemotePlayers();
+
+            // Cleanup our player document on exit
+            window.addEventListener('beforeunload', () => {
+                if (userId) {
+                    deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'players', userId));
+                }
+            });
+        }
+
+        // --- ACCOUNT CREATION & API EXPORTS ---
+        window.createAccount = async () => {
+            const usernameInput = document.getElementById('auth-username').value.trim();
+            if (!usernameInput) {
+                alert("Please choose a username to play!");
+                return;
+            }
+            
+            window.currentUsername = usernameInput;
+            document.getElementById('nav-username').innerText = window.currentUsername;
+            
+            if (window.db && window.userId) {
+                const profileRef = doc(window.db, 'artifacts', appId, 'users', window.userId, 'profile', 'main');
+                await setDoc(profileRef, {
+                    username: window.currentUsername,
+                    avatar: avatarSettings,
+                    createdAt: Date.now()
+                });
+            }
+            document.getElementById('auth-overlay').classList.add('hidden');
+            document.getElementById('main-menu').classList.remove('hidden');
+        };
+
+        window.saveProfileData = async () => {
+            if (!window.db || !window.userId) return;
+            const profileRef = doc(window.db, 'artifacts', appId, 'users', window.userId, 'profile', 'main');
+            await setDoc(profileRef, { avatar: avatarSettings }, { merge: true });
+        };
+
+        window.submitFirestoreBlock = async (blockId, bx, by, bz, colorHex) => {
+            if (!window.db) return;
+            await setDoc(doc(window.db, 'artifacts', appId, 'public', 'data', 'blocks', blockId), {
+                x: bx, y: by, z: bz,
+                color: colorHex,
+                mode: window.currentMode,
+                timestamp: Date.now()
+            });
+        };
+
+        window.deleteFirestoreBlock = async (blockId) => {
+            if (!window.db) return;
+            await deleteDoc(doc(window.db, 'artifacts', appId, 'public', 'data', 'blocks', blockId));
+        };
+
+        window.submitChatMsg = async (text) => {
+            if (!window.db) return;
+            await addDoc(collection(window.db, 'artifacts', appId, 'public', 'data', 'chat'), {
+                text: text,
+                sender: window.currentUsername,
+                mode: window.currentMode,
+                timestamp: Date.now()
+            });
+        };
+
+        window.displayChatMessage = function(sender, text) {
+            const chatMsgs = document.getElementById('chat-messages');
+            chatMsgs.classList.remove('hidden'); 
+            const msgEl = document.createElement('div');
+            msgEl.innerHTML = `<span class="font-bold text-blue-300">[${sender}]</span> <span class="break-words">${text}</span>`;
+            chatMsgs.appendChild(msgEl);
+            chatMsgs.scrollTop = chatMsgs.scrollHeight;
+            
+            // Auto hide chat window if input is not focused
+            setTimeout(() => {
+                if (document.activeElement !== document.getElementById('chat-input')) {
+                    chatMsgs.classList.add('hidden');
+                }
+            }, 10000); // Hide after 10 seconds of inactivity
+        };
+
+        initMultiplayer();
+    </script>
+</body>
+</html>
